@@ -1,0 +1,336 @@
+Public Sub ConsolidateCurrentMonth(ByVal contrAgent As String, ByVal ofileNamesWithExtensionsArray As Variant)
+    'On Error GoTo 1
+    Call TurnEvents(False, xlCalculationManual)
+    
+    Dim Coll As New Collection 'Коллекция для консолидации
+    Dim OutputArray As Variant 'Массив для вывода/присвоения готовых данных
+    Dim oExcelRowCount, oExcelColumnCount, oColumnCount As Long
+    oExcelRowCount = 1048576 'Кол-во строк в Экселе
+    oExcelColumnCount = 16384 'Кол-во столбцов в Экселе
+    oColumnCount = 6 'кол-во столбцов нужных для консолидации текущего блока (Артикул, Наименование, Контрагент, Итого)
+    
+    Dim XPTemplateList As String
+    XPTemplateList = "Шаблон(Х-П)" 'Шаблон Листа Х-П
+    
+    Dim XPList As String
+    XPList = "Х-П" 'Лист Х-П
+    
+    Dim oTemplateStartRow As Integer 'Номер строки с к-рой начинается отсчет на Листе Х-П
+    oTemplateStartRow = 3
+    
+    Dim FileBeginnings As Variant 'Названия файлов различных маркетов
+    ReDim FileBeginnings(1 To 3)
+        
+    FileBeginnings(1) = "analytics_report" 'для Ozon
+    FileBeginnings(2) = "supplier-goods" 'для Wildberries
+    FileBeginnings(3) = "displays_and_sells_goods" 'для Yandex
+    
+    Dim oContrAgentSurnamesArray As Variant 'Фамилии контрагентов
+    ReDim oContrAgentSurnamesArray(1 To 3)
+        
+    oContrAgentSurnamesArray(1) = "Kucher"
+    oContrAgentSurnamesArray(2) = "Gradoboev"
+    oContrAgentSurnamesArray(3) = "Savekin"
+    
+    Dim arrExistArticulColumn As Integer 'Номер столбца Артикул массива существующих на Листе Х-П данных
+    arrExistArticulColumn = 1
+    
+    Dim arrExistNameColumn As Integer 'Номер столбца Наименование массива существующих на Листе Х-П данных
+    arrExistNameColumn = 2
+    
+    If oContrAgentSurnamesArray(1) = contrAgent Then 'Номер столбца Первый контрагент массива существующих на Листе Х-П данных
+             arrExistContrAgentColumn = 3
+    ElseIf oContrAgentSurnamesArray(2) = contrAgent Then 'Номер столбца Второй контрагент массива существующих на Листе Х-П данных
+             arrExistContrAgentColumn = 4
+    ElseIf oContrAgentSurnamesArray(3) = contrAgent Then 'Номер столбца Третий контрагент массива существующих на Листе Х-П данных
+             arrExistContrAgentColumn = 5
+    End If
+    
+    Dim arrExistTotalColumn As Integer 'Номер столбца Итого массива существующих на Листе Х-П данных
+    arrExistTotalColumn = 6
+
+    ReDim OutputArray(1 To oExcelRowCount, 1 To oColumnCount)
+    Dim a, i, j, k, m, n As Long ' Счетчики
+    Dim newRowID, OutputRowID As Long ' Счетчики:newRowID- ID новой строки входного массива; OutputRowID - ID новой строки выходного массива
+    Dim Articul As String 'Артикул
+       
+    'Проходим по всем выбранным файлам
+    For a = 1 To UBound(ofileNamesWithExtensionsArray, 1)
+    
+ 
+            newRowID = 0
+
+            If WorksheetExists(XPList) = True Then
+               
+                'Нахождение блока Текущий
+                Dim headerRowArray As Variant 'массив для хранения данных ячеек заглавной строки
+                'ReDim headerRowArray(1 To oExcelColumnCount)
+                headerRowArray = Range("A1").Resize(1, oExcelColumnCount).Value2 'Присвоение в  массив данных ячеек заглавной строки
+        
+                Dim CurrentBlockStartColumn As Integer  'Номер столбца - начало блока Текущий
+                Dim CurrentBlockContrAgentStartColumn As Integer 'Номер столбца контрагента в блоке Текущий
+                Dim CurrentBlockTotalColumn As Integer 'Номер столбца контрагента в блоке Текущий
+                
+
+                'Нахождение номер столбца нужного контрагента
+                For i = 1 To UBound(headerRowArray, 2)
+                    If headerRowArray(1, i) = "Текущий" Then
+                        CurrentBlockStartColumn = i
+                        If contrAgent = oContrAgentSurnamesArray(1) Then 'Кучер
+                            CurrentBlockContrAgentStartColumn = CurrentBlockStartColumn
+                        ElseIf contrAgent = oContrAgentSurnamesArray(2) Then 'Градобоев
+                            CurrentBlockContrAgentStartColumn = CurrentBlockStartColumn + 1
+                        ElseIf contrAgent = oContrAgentSurnamesArray(3) Then 'Савекин
+                            CurrentBlockContrAgentStartColumn = CurrentBlockStartColumn + 2
+                        End If
+                        Exit For
+                    End If
+                Next i
+                CurrentBlockTotalColumn = CurrentBlockStartColumn + UBound(oContrAgentSurnamesArray)
+           
+               
+
+               Dim LastRow As Long 'Нахождение последней строки в солбцеАртикул
+               LastRow = Cells(Rows.Count, 1).End(xlUp).Row
+               
+               Dim arrExist As Variant 'Массив существующих на Листе Х-П данных
+               ReDim arrExist(1 To oExcelColumnCount, 1 To oColumnCount)
+
+               'Взятие столбцов Артикул и Наименование
+               Dim arrExistArticulName As Variant 'Массив существующих на Листе Х-П данных
+               ReDim arrExistArticulName(1 To LastRow - oTemplateStartRow + 1, 1 To 2)
+               
+               arrExistArticulName = Cells(oTemplateStartRow, 1).Resize(LastRow - oTemplateStartRow + 1, 2).Value2 'Взятие столбцов Артикул и Наименование
+               
+    
+               For i = 1 To LastRow - oTemplateStartRow + 1
+                   For j = 1 To 2
+                       arrExist(i, j) = arrExistArticulName(i, j)
+                   Next j
+               Next i
+               
+                'Массив существующих на Листе Х-П данных в блоке Текущий
+               Dim arrExistCurrentBlock As Variant
+               ReDim arrExistCurrentBlock(1 To LastRow - oTemplateStartRow + 1, 1 To 4)
+               arrExistCurrentBlock = Cells(oTemplateStartRow, CurrentBlockStartColumn).Resize(LastRow - oTemplateStartRow + 1, 4).Value2
+
+               'Дозаполнение массива arrExist данными из блока Текущий
+               For i = 1 To LastRow - oTemplateStartRow + 1
+                   For j = 3 To UBound(arrExist, 2)
+                       arrExist(i, j) = arrExistCurrentBlock(i, j - 2)
+                   Next j
+               Next i
+
+               'Консолидация массива arrExist  - исключение дубликатов слиянием
+               For i = 1 To LastRow - oTemplateStartRow + 1
+                   Articul = arrExist(i, 1)
+                   newRowID = newRowID + 1
+                   Coll.Add newRowID, Articul
+                   For j = 1 To oColumnCount
+                       OutputArray(newRowID, j) = arrExist(i, j)
+                   Next j
+               Next i
+            End If
+
+
+
+
+
+
+            Workbooks.Open (ThisWorkbook.Path & "\" & contrAgent & "\" & ofileNamesWithExtensionsArray(a)) 'Открытие файла
+    
+            Dim arrData As Variant 'Взятие данных с Листа текущего файла
+            arrData = Range("A1").CurrentRegion.Value2
+    
+            Dim oNameColumn As Integer 'oNameColumn - номер столбца Наименование
+            Dim oArticulColumn As Integer 'oArticulColumn - номер столбца Артикул
+            Dim oOrderedCount As Integer 'oOrderedCount -  номер столбца Заказано кол-во
+    
+            'Присвоение значений переменным oNameColumn, oArticulColumn, oOrderedCount в зависимости какой файл, какой маркетплейс
+            If Left(ofileNamesWithExtensionsArray(a), Len(FileBeginnings(1))) = FileBeginnings(1) Then
+                oMarketSheetStartRow = 2
+    
+                If arrData(1, 2) = "Товары" Then
+                    oNameColumn = 2
+                Else
+                    MsgBox "Заголовок второго столбца не называется как Товары"
+                    Exit Sub
+                End If
+    
+                If arrData(1, 5) = "Артикул" Then
+                    oArticulColumn = 5
+                Else
+                    MsgBox "Заголовок пятого столбца не называется как Артикул"
+                    Exit Sub
+                End If
+    
+                If arrData(1, 6) = "Заказано товаров" Then
+                    oOrderedCount = 6
+                Else
+                    MsgBox "Заголовок шестого столбца не называется как Заказано товаров"
+                    Exit Sub
+                End If
+            ElseIf Left(ofileNamesWithExtensionsArray(a), Len(FileBeginnings(2))) = FileBeginnings(2) Then
+              
+                oMarketSheetStartRow = 3
+    
+                If arrData(2, 5) = "Наименование" Then
+                    oNameColumn = 5
+                Else
+                    MsgBox "Заголовок пятого столбца не называется как Наименование"
+                    Exit Sub
+                End If
+    
+                If arrData(2, 8) = "Баркод" Then
+                    oArticulColumn = 8
+                Else
+                    MsgBox "Заголовок восьмого столбца не называется как Баркод"
+                    Exit Sub
+                End If
+    
+                If arrData(1, 13) = "Заказано" Then
+                    oOrderedCount = 13
+                Else
+                    MsgBox "Заголовок шестого столбца не называется как Заказано"
+                    Exit Sub
+                End If
+            ElseIf Left(ofileNamesWithExtensionsArray(a), Len(FileBeginnings(3))) = FileBeginnings(3) Then
+                oMarketSheetStartRow = 2
+    
+                If arrData(1, 11) = "Название товара" Then
+                    oNameColumn = 11
+                Else
+                    MsgBox "Заголовок одиннадцатого столбца не называется как Название товара"
+                    Exit Sub
+                End If
+    
+                If arrData(1, 10) = "Ваш SKU" Then
+                    oArticulColumn = 10
+                Else
+                    MsgBox "Заголовок десятого столбца не называется как Ваш SKU"
+                    Exit Sub
+                End If
+    
+                If arrData(1, 15) = "Продажи, шт." Then
+                    oOrderedCount = 15
+                Else
+                    MsgBox "Заголовок пятнадцатого столбца не называется как Продажи, шт."
+                    Exit Sub
+                End If
+            End If
+
+   
+         Dim oMarketSheetEnd As Integer 'Булевая переменная для отслеживания существует ли строка Итого в файле
+         If arrData(UBound(arrData, 1), oNameColumn) = vbNullString And arrData(UBound(arrData, 1), oArticulColumn) = vbNullString Then
+             oMarketSheetEnd = 1
+         Else
+             oMarketSheetEnd = 0
+         End If
+
+
+        newRowID = 0
+         'Консолидация массива arrData - исключение дубликатов слиянием
+         For j = oMarketSheetStartRow To UBound(arrData, 1) - oMarketSheetEnd
+             Articul = arrData(j, oArticulColumn)
+             If KeyExistsInColl(Coll, Articul) = False Then
+                  newRowID = newRowID + 1
+                  Coll.Add newRowID, Articul
+                  OutputArray(newRowID, 1) = Articul
+             End If
+
+             OutputRowID = Coll(Articul)
+             OutputArray(OutputRowID, 2) = arrData(j, oNameColumn)
+             OutputArray(OutputRowID, arrExistContrAgentColumn) = CInt(OutputArray(OutputRowID, arrExistContrAgentColumn)) + CInt(arrData(j, oOrderedCount))
+         Next j
+ 
+
+         ActiveWorkbook.Close Savechanges:=False 'Закрытие текущего файла без сохр-я
+ 
+         'Подсчет итогов в массиве OutputArray
+         For k = 1 To UBound(OutputArray, 1)
+             OutputArray(k, arrExistTotalColumn) = OutputArray(k, arrExistTotalColumn) + OutputArray(k, arrExistContrAgentColumn)
+         Next k
+
+
+     Next a
+        'Проверяем существует ли Лист Х-П
+         If WorksheetExists(XPList) = False Then
+    
+            'Проверяем существует ли Шаблон(Лист Х-П)
+            If WorksheetExists(XPTemplateList) = True Then
+                Sheets(XPTemplateList).Copy after:=Sheets(XPTemplateList)
+            Else
+                MsgBox ("No sheet called Шаблон(" & XPTemplateList & ")")
+                Exit Sub
+            End If
+            ActiveSheet.Name = XPList 'Переименовать скопированный файл из Шаблона
+         Else
+            Worksheets(XPList).Activate 'Активируем Лист Х-П
+         End If
+
+            
+    Stop
+    'Нахождение кол-ва непустых строк в массиве OutputArray
+    Dim nonEmptyRowsCount As Variant
+    For i = 1 To UBound(OutputArray, 1)
+        If OutputArray(i, 1) = vbNullString Then
+            Exit For
+        End If
+        nonEmptyRowsCount = nonEmptyRowsCount + 1
+    Next i
+    
+    
+    Dim arrLast As Variant
+    ReDim arrLast(1 To nonEmptyRowsCount, 1 To 6)
+    ReDim arrLast(1 To 6385, 1 To 6)
+    For i = 1 To UBound(OutputArray, 1)
+        For j = 1 To UBound(OutputArray, 2)
+            If OutputArray(i, j) = vbNullString Then
+                Exit For
+            End If
+            arrLast(i, j) = OutputArray(i, j)
+        Next j
+    Next i
+
+    Stop
+    With Worksheets(XPList)
+         'Проходим по столцбам Артикул, Наименование  и записываем данные
+         .Cells(oTemplateStartRow, 1).Resize(UBound(arrLast, 1), 1).Value = arrLast
+         .Cells(oTemplateStartRow, 2).Resize(UBound(arrLast, 1), 1).Value = WorksheetFunction.Index(arrLast, 0, 2) '>>>error
+         
+         
+          
+         'Проходим по всем столбцам блока текущий и записываем данные (столбцы Контрагенты и Итого)
+         .Cells(oTemplateStartRow, CurrentBlockStartColumn).Resize(UBound(arrLast, 1), 1).Value2 = WorksheetFunction.Index(arrLast, 0, 3) '>>>error
+         .Cells(oTemplateStartRow, CurrentBlockStartColumn + 1).Resize(UBound(arrLast, 1), 1).Value2 = WorksheetFunction.Index(arrLast, 0, 4) '>>>error
+         .Cells(oTemplateStartRow, CurrentBlockStartColumn + 2).Resize(UBound(arrLast, 1), 1).Value2 = WorksheetFunction.Index(arrLast, 0, 5) '>>>error
+         .Cells(oTemplateStartRow, CurrentBlockStartColumn + 3).Resize(UBound(arrLast, 1), 1).Value2 = WorksheetFunction.Index(arrLast, 0, arrExistTotalColumn) '>>>error
+    End With
+    
+    Worksheets("Запуск").Activate
+    Call TurnEvents(True, xlCalculationAutomatic)
+End Sub
+
+Public Function KeyExistsInColl(Coll As Collection, ByVal sKey As String) As Boolean
+    On Error GoTo ErrHander
+    IsObject (Coll.Item(sKey))
+    KeyExistsInColl = True
+ErrHander:
+End Function
+
+Public Function WorksheetExists(shtName As String, Optional wb As Workbook) As Boolean
+    Dim sht As Worksheet
+
+    If wb Is Nothing Then Set wb = ThisWorkbook
+    On Error Resume Next
+    Set sht = wb.Sheets(shtName)
+    On Error GoTo 0
+    WorksheetExists = Not sht Is Nothing
+End Function
+
+Public Function TurnEvents(ByVal bool As Boolean, ByVal omethod As String)
+    Application.Calculation = omethod
+    Application.ScreenUpdating = bool
+    Application.EnableEvents = bool
+    Application.DisplayAlerts = bool
+End Function
